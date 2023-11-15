@@ -3,6 +3,7 @@
 #include <string>
 #include <bits/stdc++.h>
 #include <cmath>
+#include <fstream>
 
 using namespace std;
 
@@ -141,6 +142,26 @@ std::vector<float> Vect_multi(std::vector<std::vector<float>> A, std::vector<flo
     return res;
 }
 
+std::vector<float> Vect_multi_w(std::vector<std::vector<float>> A, std::vector<float> V, int size, int N){
+    std::vector<float> res(size, 0.0);
+
+    for(int i=0; i < N; i++){
+        for(int j=0; j < N; j++){
+            res[i*N+j] += A[i*N+j][i*N+j] * V[i * N + j];
+            if(i+1 != N)
+                res[i*N+j] += A[i*N+j][(i+1)*N+j] * V[(i+1) * N + j];
+            if(j+1 != N)
+                res[i*N+j] += A[i*N+j][j+1+i*N] * V[i * N + (j+1)];
+            if(i-1 > 0)
+                res[i*N+j] += A[i*N+j][(i-1)*N+j] * V[(i-1) * N + j];
+            if(j-1 > 0)
+                res[i*N+j] += A[i*N+j][j-1+i*N] * V[i * N + (j-1)];
+        }
+    }
+
+    return res;
+}
+
 std::vector<float> Vect_multi_scalar(std::vector<float> V, float num, int size){
     std::vector<float> res(size, 0.0);
 
@@ -170,7 +191,7 @@ float Vector_Euclid(std::vector<float> V, int size, float h1, float h2){
     return sqrt(res);
 }
 
-std::tuple<std::vector<float>, int> MinNev(int size, std::vector<std::vector<float>> A, std::vector<float> F, float sigma, float h1, float h2){
+std::tuple<std::vector<float>, int> MinNev(int size, std::vector<std::vector<float>> A, std::vector<float> F, float sigma, float h1, float h2, int N){
     std::vector<float> w(size, 0.0);
     std::vector<float> w_plus1(size, 0.0);
     std::vector<float> r(size, 0.0);
@@ -179,15 +200,16 @@ std::tuple<std::vector<float>, int> MinNev(int size, std::vector<std::vector<flo
     float tau = 0.0;
     float condition = 1.0;
     int counter = 0;
-
+    
     do{
-        r = Vect_dif(Vect_multi(A, w, size), F, size);
+        r = Vect_dif(Vect_multi_w(A, w, size, N), F, size);
         Ar = Vect_multi(A, r, size);
         delim = Vector_Euclid(Ar, size, h1, h2);
         tau = Vect_scalar(Ar, r, size, h1, h2) / (delim * delim);
         w_plus1 = Vect_dif(w, Vect_multi_scalar(r, tau, size), size);
         condition = Vector_Euclid(Vect_dif(w_plus1, w, size), size, h1, h2);
-        cout<<condition<<endl;
+        if ((counter % 100) == 0)
+            cout<<condition<<endl;
         w = w_plus1;
         counter++;
     }while (condition >= sigma);
@@ -212,31 +234,19 @@ void get_A(float h_1, float h_2, float eps, int grid_size, std::vector<std::vect
     float b_ij;
     float a_i1_j;
     float b_i_j1;
-    float sigma = 1/1000000.0;
+    float sigma = 1/100000.0;
     int number_of_iterations;
 
     for(int i=1;i < grid_size;i++){
         for(int j=1;j < grid_size;j++){
-            x_min = min(grid[i][j].x - 0.5 * h_1, grid[i][j].x + 0.5 * h_1);
-            x_max = max(grid[i][j].x - 0.5 * h_1, grid[i][j].x + 0.5 * h_1);
-            y_min = min(grid[i][j].y - 0.5 * h_2, grid[i][j].y + 0.5 * h_2);
-            y_max = max(grid[i][j].y - 0.5 * h_2, grid[i][j].y + 0.5 * h_2);
-            a_ij = get_a(h_2, eps, x_min, x_min, y_min, y_max, n_points);
-            b_ij = get_b(h_1, eps, x_min, x_max, y_min, y_min, n_points);
-            F[i *(grid_size + 1) + j] = get_F(h_1, h_2, eps, x_min, x_max, y_min, y_max, n_points);
 
-            x_min = min(grid[i+1][j].x - 0.5 * h_1, grid[i+1][j].x + 0.5 * h_1);
-            x_max = max(grid[i+1][j].x - 0.5 * h_1, grid[i+1][j].x + 0.5 * h_1);
-            y_min = min(grid[i+1][j].y - 0.5 * h_2, grid[i+1][j].y + 0.5 * h_2);
-            y_min = max(grid[i+1][j].y - 0.5 * h_2, grid[i+1][j].y + 0.5 * h_2);
-            a_i1_j = get_a(h_2, eps, x_min, x_min, y_min, y_max, n_points);
+            a_ij = get_a(h_2, eps, grid[i][j].x - 0.5 * h_1, grid[i][j].x - 0.5 * h_1, grid[i][j].y - 0.5 * h_2, grid[i][j].y + 0.5 * h_2, n_points);
+            b_ij = get_b(h_1, eps, grid[i][j].x - 0.5 * h_1, grid[i][j].x + 0.5 * h_1, grid[i][j].y - 0.5 * h_2, grid[i][j].y - 0.5 * h_2, n_points);
+            F[i *(grid_size + 1) + j] = get_F(h_1, h_2, eps, grid[i][j].x - 0.5 * h_1, grid[i][j].x + 0.5 * h_1, grid[i][j].y - 0.5 * h_2, grid[i][j].y + 0.5 * h_2, n_points);
 
-            x_min = min(grid[i][j+1].x - 0.5 * h_1, grid[i][j+1].x + 0.5 * h_1);
-            x_max = max(grid[i][j+1].x - 0.5 * h_1, grid[i][j+1].x + 0.5 * h_1);
-            y_min = min(grid[i][j+1].y - 0.5 * h_2, grid[i][j+1].y + 0.5 * h_2);
-            y_min = max(grid[i][j+1].y - 0.5 * h_2, grid[i][j+1].y + 0.5 * h_2);
-            b_i_j1 = get_b(h_1, eps, x_min, x_max, y_min, y_min, n_points);
+            a_i1_j = get_a(h_2, eps, grid[i+1][j].x - 0.5 * h_1, grid[i+1][j].x - 0.5 * h_1, grid[i+1][j].y - 0.5 * h_2, grid[i+1][j].y + 0.5 * h_2, n_points);
 
+            b_i_j1 = get_b(h_1, eps, grid[i][j+1].x - 0.5 * h_1, grid[i][j+1].x + 0.5 * h_1, grid[i][j+1].y - 0.5 * h_2, grid[i][j+1].y - 0.5 * h_2, n_points);
 
             A[i * (grid_size + 1) + j][i * (grid_size + 1) + j] = (a_i1_j + a_ij) / (h_1 * h_1) + (b_i_j1 + b_ij) / (h_2 * h_2);
             if (i == 1) {
@@ -281,32 +291,38 @@ void get_A(float h_1, float h_2, float eps, int grid_size, std::vector<std::vect
             }
         }
     }
-
+    cout<<endl;
     print_matrix(A, (grid_size+1)*(grid_size+1), (grid_size+1)*(grid_size+1));
     for(int i=0; i< grid_size+1;i++){
         for(int j=0; j<grid_size+1;j++)
             cout<<F[i * (grid_size+1) + j]<<",";
-        cout<<endl;
+        //cout<<endl;
     }
-    std::tie(ans, number_of_iterations) = MinNev((grid_size + 1) * (grid_size + 1),A, F, sigma, h_1, h_2);
+    cout << endl;
+    std::tie(ans, number_of_iterations) = MinNev((grid_size + 1) * (grid_size + 1),A, F, sigma, h_1, h_2, grid_size+1);
     cout<<"MinNev_iterations -> "<<number_of_iterations<<endl;
-    /*
-    for(int i=0; i < (grid_size + 1) * (grid_size + 1); i++){
-        if ((i / float((grid_size + 1))) == 1.0)
-            cout<<"\n";
+    
+    std::ofstream out;
+    out.open("results.txt");
+    if(out.is_open()){
+        for(int i=0; i < (grid_size + 1) * (grid_size + 1); i++)
+            out<<ans[i]<<endl;
+    }
+    out.close();
+
+    for(int i=0; i < (grid_size + 1) * (grid_size + 1); i++)
         cout<<ans[i]<<",";
-    }*/
 
 
 }
 
 int main()
 {
-    int grid_size = 10;
-    float A1 = -2.5;
-    float A2 = -2.5;
-    float B1 = 2.5;
-    float B2 = 1.5;
+    int grid_size = 20;
+    float A1 = -2.0;
+    float A2 = -2.0;
+    float B1 = 2.0;
+    float B2 = 1.0;
     float h1 = (B1 - A1)/grid_size;
     float h2 = (B2 - A2)/grid_size;
     float eps = max(h1,h2)*max(h1,h2);
