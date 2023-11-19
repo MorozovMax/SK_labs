@@ -145,48 +145,60 @@ double Vector_Euclid(const std::vector<double> &V, int size, double h1, double h
     return sqrt(res);
 }
 
+double Tau_count(const std::vector<std::vector<double>> &A, const std::vector<double> &w, const std::vector<double> &F, double grid_size, std::vector<double> &r){
+    double top = 0.0;
+    double delim = 0.0;
+    int size = A.size() - grid_size - 2;
+
+    #pragma omp parallel for reduction(+:delim) reduction(+:top)
+    for (int i = grid_size + 2; i < size; i++) {
+        double tmp = 0.0;
+        tmp += A[i][i] * w[i];
+        tmp += A[i][i - 1] * w[i - 1];
+        tmp += A[i][i + 1] * w[i + 1];
+        tmp += A[i][i - grid_size - 1] * w[i - grid_size - 1];
+        tmp += A[i][i + grid_size + 1] * w[i + grid_size + 1];
+        r[i] = tmp - F[i];
+        tmp = 0.0;
+        tmp += A[i][i] * r[i];
+        tmp += A[i][i - 1] * r[i - 1];
+        tmp += A[i][i + 1] * r[i + 1];
+        tmp += A[i][i - grid_size - 1] * r[i - grid_size - 1];
+        tmp += A[i][i + grid_size + 1] * r[i + grid_size + 1];
+        delim += tmp * tmp;
+        top += tmp * r[i];
+    }
+    return top/delim;
+}
+
+double Condition_count(const std::vector<double> &w, const std::vector<double> &r, double tau, int size, std::vector<double> &w_plus1, double h1, double h2){
+    double condition = 0.0;
+    #pragma omp parallel for reduction(+:condition)
+    for(int i=0; i<size; i++){
+        w_plus1[i] = w[i] - (r[i] * tau);
+        condition += (w_plus1[i] - w[i]) * (w_plus1[i] - w[i]);
+    }
+    return sqrt(condition * h1 * h2);
+}
+
 std::tuple<const std::vector<double>, int> MinNev(int size, const std::vector<std::vector<double>> &A, const std::vector<double> &F, double sigma, double h1, double h2, int grid_size){
     std::vector<double> w(size, 0.0);
     std::vector<double> w_plus1(size, 0.0);
-    std::vector<double> tmp_vec(size, 0.0);
     std::vector<double> r(size, 0.0);
-    std::vector<double> r_tau(size, 0.0);
-    std::vector<double> Ar(size, 0.0);
-    std::vector<double> Aw(size, 0.0);
-    double delim = 0.0;
     double tau = 0.0;
-    double tmp = 0.0;
     double condition = 1.0;
     int counter = 0;
 
     do{
-        #pragma omp parallel for
-        for (int i = grid_size + 2; i < A.size() - grid_size - 2; i++) {
-            double tmp = 0.0;
-            tmp += A[i][i] * w[i];
-            tmp += A[i][i - 1] * w[i - 1];
-            tmp += A[i][i + 1] * w[i + 1];
-            tmp += A[i][i - grid_size - 1] * w[i - grid_size - 1];
-            tmp += A[i][i + grid_size + 1] * w[i + grid_size + 1];
-            r[i] = tmp - F[i];
-            tmp = 0.0;
-            tmp += A[i][i] * r[i];
-            tmp += A[i][i - 1] * r[i - 1];
-            tmp += A[i][i + 1] * r[i + 1];
-            tmp += A[i][i - grid_size - 1] * r[i - grid_size - 1];
-            tmp += A[i][i + grid_size + 1] * r[i + grid_size + 1];
-            Ar[i] = tmp;
-        }
-        delim = Vect_scalar(Ar, Ar, size, h1, h2);
-        tau = Vect_scalar(Ar, r, size, h1, h2) / delim;
-        Vect_multi_scalar(r, tau, size, r_tau);
-        Vect_dif(w,r_tau, size, grid_size, w_plus1);
-        Vect_dif(w_plus1, w, size, grid_size, tmp_vec);
-        condition = Vector_Euclid(tmp_vec, size, h1, h2);
+        tau = Tau_count(A, w, F, grid_size, r);
+
+        condition = Condition_count(w, r, tau, size, w_plus1, h1, h2);
+
         if ((counter % 10000) == 0)
             cout<<condition<<endl;
         w = w_plus1;
         counter++;
+
     }while (condition >= sigma);
     return std::make_tuple(w, counter);
     
@@ -209,7 +221,7 @@ void main_cicle(double h_1, double h_2, double eps, int grid_size, const std::ve
     double a_i1_j;
     double b_i_j1;
     int number_of_iterations;
-
+    #pragma omp parallel for private(a_ij) private(b_ij) private(a_i1_j) private(b_i_j1)
     for(int i=1;i < grid_size;i++){
         for(int j=1;j < grid_size;j++){
 
