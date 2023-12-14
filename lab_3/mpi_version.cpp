@@ -157,7 +157,7 @@ double Tau_count(const std::vector<std::vector<double>> &A, const std::vector<do
     MPI_Status status;
 
     if (rank==0){
-        //#pragma omp parallel for reduction(+:delim) reduction(+:top)
+        #pragma omp parallel for reduction(+:delim) reduction(+:top)
         for (int i = start; i < stop; i++) {
             double tmp = 0.0;
             tmp += A[i][3] * w[i];
@@ -183,7 +183,7 @@ double Tau_count(const std::vector<std::vector<double>> &A, const std::vector<do
         return (top + buf_top)/(delim + buf_delim);
     }
     else{
-        //#pragma omp parallel for reduction(+:delim) reduction(+:top)
+        #pragma omp parallel for reduction(+:delim) reduction(+:top)
         for (int i = start; i < stop; i++) {
             double tmp = 0.0;
             tmp += A[i][3] * w[i + A.size() + grid_size + 1];
@@ -217,7 +217,7 @@ double Condition_count(const std::vector<double> &w, const std::vector<double> &
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Status status;
 
-    //#pragma omp parallel for reduction(+:condition)
+    #pragma omp parallel for reduction(+:condition)
     for(int i=start; i<stop; i++){
         w_plus1[i] = w[i] - (r[i] * tau);
         condition += (w_plus1[i] - w[i]) * (w_plus1[i] - w[i]);
@@ -312,7 +312,7 @@ void matrix_init(std::vector<std::vector<double>> &A, std::vector<double> &F,con
     double a_i1_j;
     double b_i_j1;
     int n_points = 1000;
-    //#pragma omp parallel for private(a_ij) private(b_ij) private(a_i1_j) private(b_i_j1)
+    #pragma omp parallel for private(a_ij) private(b_ij) private(a_i1_j) private(b_i_j1)
     for(int i=1;i < stop;i++){
         for(int j=1;j < grid_size;j++){
             a_ij = get_a(h_2, eps, grid[i][j].x - 0.5 * h_1, grid[i][j].x - 0.5 * h_1, grid[i][j].y - 0.5 * h_2, grid[i][j].y + 0.5 * h_2, n_points);
